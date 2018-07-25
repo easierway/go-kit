@@ -8,7 +8,7 @@ import (
 )
 
 func TestConsulResolver(t *testing.T) {
-	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond)
+	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -28,7 +28,7 @@ func TestConsulResolver(t *testing.T) {
 }
 
 func TestConcurrency(t *testing.T) {
-	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond)
+	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond, 0)
 	if err != nil {
 		panic(err)
 	}

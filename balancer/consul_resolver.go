@@ -19,18 +19,19 @@ type ConsulResolverBuilder struct {
 	Service   string
 	Interval  time.Duration
 	MyService string
+	Ratio     float64
 }
 
 // Build a ConsulResolver
 func (b *ConsulResolverBuilder) Build() (*ConsulResolver, error) {
 	return NewConsulResolver(
-		b.Address, b.Service, b.MyService, b.Interval,
+		b.Address, b.Service, b.MyService, b.Interval, b.Ratio,
 	)
 }
 
 // NewConsulResolver create a new ConsulResolver
 func NewConsulResolver(
-	address string, service string, myService string, interval time.Duration,
+	address string, service string, myService string, interval time.Duration, ratio float64,
 ) (*ConsulResolver, error) {
 	config := api.DefaultConfig()
 	config.Address = address
@@ -47,6 +48,7 @@ func NewConsulResolver(
 		zone:          zone(),
 		done:          false,
 		cpuPercentage: 50,
+		ratio:         ratio,
 	}
 
 	if err := r.Start(); err != nil {
@@ -67,11 +69,13 @@ type ConsulResolver struct {
 	myLastIndex     uint64
 	zone            string
 	factorThreshold int
+	myServiceNum    int
 	localZone       *ServiceZone
 	otherZone       *ServiceZone
 	interval        time.Duration
 	done            bool
 	cpuPercentage   int
+	ratio           float64
 }
 
 func (r *ConsulResolver) cpuusage() error {
@@ -150,7 +154,11 @@ func (r *ConsulResolver) DiscoverNode() *ServiceNode {
 		return nil
 	}
 
-	factorThreshold := r.factorThreshold * r.cpuPercentage / 100
+	factorThreshold := r.factorThreshold
+	if r.ratio != 0 {
+		factorThreshold = int(float64((r.localZone.FactorMax+r.otherZone.FactorMax)*r.myServiceNum) * r.ratio / float64(len(r.localZone.Factors)+len(r.otherZone.Factors)))
+	}
+	factorThreshold = factorThreshold * r.cpuPercentage / 100
 	if factorThreshold <= r.localZone.FactorMax && r.localZone.FactorMax > 0 {
 		idx := sort.SearchInts(
 			r.localZone.Factors,
@@ -189,6 +197,7 @@ func (r *ConsulResolver) calFactorThreshold() error {
 	r.myLastIndex = metainfo.LastIndex
 
 	factorThreshold := 0
+	myServiceNum := 0
 	for _, service := range services {
 		balanceFactor := 0
 		zone := "unknown"
@@ -202,10 +211,12 @@ func (r *ConsulResolver) calFactorThreshold() error {
 		}
 		if zone == r.zone {
 			factorThreshold = balanceFactor
+			myServiceNum++
 		}
 	}
 
 	r.factorThreshold = factorThreshold
+	r.myServiceNum = myServiceNum
 	fmt.Printf("update factorThreshold [%v], lastIndex [%v]\n", r.factorThreshold, r.myLastIndex)
 
 	return nil
