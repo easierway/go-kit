@@ -1,0 +1,44 @@
+hash: 5c618ac9288173f5119e5a89c98164e2b968b8f0ed77f4e539292ca96b58bc6d
+updated: 2018-07-25T17:25:15.36255+08:00
+imports:
+- name: github.com/armon/go-metrics
+  version: 58588f401c2cc130a7308a52ca3bc6c0a76db04b
+- name: github.com/go-ole/go-ole
+  version: 7a0fa49edf48165190530c675167e2f319a05268
+  subpackages:
+  - oleutil
+- name: github.com/hashicorp/consul
+  version: 28141971f966e99916da2c5e461dd968746491cd
+  subpackages:
+  - api
+- name: github.com/hashicorp/go-cleanhttp
+  version: d5fe4b57a186c716b0e00b8c301cbd9b4182694d
+- name: github.com/hashicorp/go-immutable-radix
+  version: 7f3cd4390caab3250a57f30efdb2a65dd7649ecf
+- name: github.com/hashicorp/go-rootcerts
+  version: 6bb64b370b90e7ef1fa532be9e591a81c3493e00
+- name: github.com/hashicorp/golang-lru
+  version: 0fb14efe8c47ae851c0034ed7a448854d3d34cf3
+  subpackages:
+  - simplelru
+- name: github.com/hashicorp/serf
+  version: 984a73625de3138f44deb38d00878fab39eb6447
+  subpackages:
+  - coordinate
+- name: github.com/mitchellh/go-homedir
+  version: 3864e76763d94a6df2f9960b16a20a33da9f9a66
+- name: github.com/mitchellh/mapstructure
+  version: b4575eea38cca1123ec2dc90c26529b5c5acfcff
+- name: github.com/shirou/gopsutil
+  version: 4a180b209f5f494e5923cfce81ea30ba23915877
+  subpackages:
+  - cpu
+  - internal/common
+- name: github.com/StackExchange/wmi
+  version: b12b22c5341f0c26d88c4d66176330500e84db68
+- name: golang.org/x/sys
+  version: 7138fd3d9dc8335c567ca206f4333fb75eb05d56
+  subpackages:
+  - unix
+  - windows
+testImports: []
