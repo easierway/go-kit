@@ -24,8 +24,8 @@ def default_balance_factor_map(dst="consul/factor_map.json", consul="localhost:8
     if res.status_code != 200:
         return {
             "m4.4xlarge": 100,
-            "r4.4xlarge": 120,
-            "c4.4xlarge": 130,
+            "r4.4xlarge": 100,
+            "c4.4xlarge": 100,
             "unknown": 100,
         }
     return json.loads(res.text)
@@ -171,7 +171,17 @@ def config(datacenter):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""Example:
+    python3 consul.py config sg > /etc/consul.json
+    python3 consul.py kvput --src factor_map.json --dst consul/as/factor_map.json
+    python3 consul.py kvget consul/as/factor_map.json
+    python3 consul.py register as 9099 --factor-map consul/as/factor_map.json
+    python3 consul.py register rs 7077 --factor-map consul/rs/factor_map.json
+    python3 consul.py services as | jq '.[] | {Node,ServiceID}'
+""",
+    )
     parser.add_argument("operation", nargs="?", type=str,
                         choices=["register", "services",
                                  "deregister", "kvget", "kvput", "config"],
