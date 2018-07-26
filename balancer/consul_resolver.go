@@ -78,24 +78,25 @@ type ConsulResolver struct {
 	ratio           float64
 }
 
-func (r *ConsulResolver) cpuusage() error {
-	percentage, err := cpu.Percent(0, true)
-	if err != nil {
-		return err
-	}
-	p := int(percentage[0])
-	if p <= 0 {
-		r.cpuPercentage = 1
-	} else {
-		r.cpuPercentage = p
-	}
+// ServiceNode service node
+type ServiceNode struct {
+	Address       string
+	Host          string
+	Port          int
+	Zone          string
+	BalanceFactor int
+}
 
-	return nil
+// ServiceZone service zone
+type ServiceZone struct {
+	Nodes     []*ServiceNode
+	Factors   []int
+	FactorMax int
 }
 
 // Start resolve
 func (r *ConsulResolver) Start() error {
-	if err := r.cpuusage(); err != nil {
+	if err := r.cpuUsage(); err != nil {
 		return err
 	}
 	if err := r.calFactorThreshold(); err != nil {
@@ -110,7 +111,7 @@ func (r *ConsulResolver) Start() error {
 			if r.done {
 				break
 			}
-			r.cpuusage()
+			r.cpuUsage()
 		}
 	}()
 	go func() {
@@ -185,6 +186,21 @@ func (r *ConsulResolver) DiscoverNode() *ServiceNode {
 		rand.Intn(r.otherZone.FactorMax),
 	)
 	return r.otherZone.Nodes[idx]
+}
+
+func (r *ConsulResolver) cpuUsage() error {
+	percentage, err := cpu.Percent(0, true)
+	if err != nil {
+		return err
+	}
+	p := int(percentage[0])
+	if p <= 0 {
+		r.cpuPercentage = 1
+	} else {
+		r.cpuPercentage = p
+	}
+
+	return nil
 }
 
 func (r *ConsulResolver) calFactorThreshold() error {
@@ -279,20 +295,4 @@ func (r *ConsulResolver) resolve() error {
 	fmt.Printf("update otherZone [%v], lastIndex [%v]\n", string(buf), r.lastIndex)
 
 	return nil
-}
-
-// ServiceNode service node
-type ServiceNode struct {
-	Address       string
-	Host          string
-	Port          int
-	Zone          string
-	BalanceFactor int
-}
-
-// ServiceZone service zone
-type ServiceZone struct {
-	Nodes     []*ServiceNode
-	Factors   []int
-	FactorMax int
 }
