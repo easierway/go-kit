@@ -170,7 +170,7 @@ func (r *ConsulResolver) DiscoverNode() *ServiceNode {
 
 	// factorMax = min(sun(factor), factorThreshold)
 	factorMax := r.otherZone.FactorMax + r.localZone.FactorMax
-	if factorMax > factorThreshold && r.factorThreshold > 0 {
+	if factorMax > factorThreshold && factorThreshold > 0 {
 		factorMax = factorThreshold
 	}
 	factor := rand.Intn(factorMax)
