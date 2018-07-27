@@ -226,7 +226,7 @@ func (r *ConsulResolver) calFactorThreshold() error {
 			zone = z
 		}
 		if zone == r.zone {
-			factorThreshold = balanceFactor
+			factorThreshold += balanceFactor
 			myServiceNum++
 		}
 	}
