@@ -117,7 +117,7 @@ def services(service="", consul="localhost:8500"):
     if not service:
         url = "http://{}/v1/catalog/services".format(consul)
     else:
-        url = "http://{}/v1/catalog/service/{}?passing=true".format(
+        url = "http://{}/v1/health/service/{}?passing=true".format(
             consul, service)
     res = requests.get(url)
     if res.status_code != 200:
