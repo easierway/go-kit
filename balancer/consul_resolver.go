@@ -41,14 +41,14 @@ func NewConsulResolver(
 	}
 
 	r := &ConsulResolver{
-		client:        client,
-		service:       service,
-		myService:     myService,
-		interval:      interval,
-		zone:          zone(),
-		done:          false,
-		cpuPercentage: 50,
-		ratio:         ratio,
+		client:    client,
+		service:   service,
+		myService: myService,
+		interval:  interval,
+		ratio:     ratio,
+		done:      false,
+		cpuUsage:  50,
+		zone:      zone(),
 	}
 
 	if err := r.Start(); err != nil {
@@ -74,7 +74,7 @@ type ConsulResolver struct {
 	otherZone       *ServiceZone
 	interval        time.Duration
 	done            bool
-	cpuPercentage   int
+	cpuUsage        int
 	ratio           float64
 }
 
@@ -96,13 +96,13 @@ type ServiceZone struct {
 
 // Start resolve
 func (r *ConsulResolver) Start() error {
-	if err := r.cpuUsage(); err != nil {
+	if err := r.updateCPUUsage(); err != nil {
 		return err
 	}
-	if err := r.calFactorThreshold(); err != nil {
+	if err := r.updateFactorThreshold(); err != nil {
 		return err
 	}
-	if err := r.resolve(); err != nil {
+	if err := r.updateServiceZone(); err != nil {
 		return err
 	}
 
@@ -111,7 +111,7 @@ func (r *ConsulResolver) Start() error {
 			if r.done {
 				break
 			}
-			r.cpuUsage()
+			r.updateCPUUsage()
 		}
 	}()
 	go func() {
@@ -119,7 +119,7 @@ func (r *ConsulResolver) Start() error {
 			if r.done {
 				break
 			}
-			r.calFactorThreshold()
+			r.updateFactorThreshold()
 		}
 	}()
 	go func() {
@@ -127,7 +127,7 @@ func (r *ConsulResolver) Start() error {
 			if r.done {
 				break
 			}
-			r.resolve()
+			r.updateServiceZone()
 		}
 	}()
 
@@ -151,59 +151,52 @@ func (r *ConsulResolver) GetOtherZone() *ServiceZone {
 
 // DiscoverNode get one address
 func (r *ConsulResolver) DiscoverNode() *ServiceNode {
-	if r.localZone.FactorMax+r.otherZone.FactorMax == 0 {
+	localZone := r.localZone
+	otherZone := r.otherZone
+
+	if localZone.FactorMax+otherZone.FactorMax == 0 {
 		return nil
 	}
 
 	factorThreshold := r.factorThreshold
 	if r.ratio != 0 {
-		factorThreshold = int(float64((r.localZone.FactorMax+r.otherZone.FactorMax)*r.myServiceNum) * r.ratio / float64(len(r.localZone.Factors)+len(r.otherZone.Factors)))
+		m := float64((localZone.FactorMax+otherZone.FactorMax)*r.myServiceNum) * r.ratio
+		n := float64(len(localZone.Factors) + len(otherZone.Factors))
+		factorThreshold = int(m / n)
 	}
-	factorThreshold = factorThreshold * r.cpuPercentage / 100
-	if factorThreshold <= r.localZone.FactorMax && r.localZone.FactorMax > 0 {
-		idx := sort.SearchInts(
-			r.localZone.Factors,
-			rand.Intn(r.localZone.FactorMax),
-		)
-		return r.localZone.Nodes[idx]
-	}
+	factorThreshold = factorThreshold * r.cpuUsage / 100
 
-	// factorMax = min(sun(factor), factorThreshold)
-	factorMax := r.otherZone.FactorMax + r.localZone.FactorMax
-	if factorMax > factorThreshold && factorThreshold > 0 {
-		factorMax = factorThreshold
+	serviceZone := localZone
+	if factorThreshold > localZone.FactorMax || localZone.FactorMax <= 0 {
+		factorMax := otherZone.FactorMax + localZone.FactorMax
+		if factorMax > factorThreshold && factorThreshold > 0 {
+			factorMax = factorThreshold
+		}
+		factor := rand.Intn(factorMax)
+		if factor >= localZone.FactorMax {
+			serviceZone = otherZone
+		}
 	}
-	factor := rand.Intn(factorMax)
-	if factor < r.localZone.FactorMax {
-		idx := sort.SearchInts(
-			r.localZone.Factors,
-			rand.Intn(r.localZone.FactorMax),
-		)
-		return r.localZone.Nodes[idx]
-	}
-	idx := sort.SearchInts(
-		r.otherZone.Factors,
-		rand.Intn(r.otherZone.FactorMax),
-	)
-	return r.otherZone.Nodes[idx]
+	idx := sort.SearchInts(serviceZone.Factors, rand.Intn(serviceZone.FactorMax))
+	return serviceZone.Nodes[idx]
 }
 
-func (r *ConsulResolver) cpuUsage() error {
+func (r *ConsulResolver) updateCPUUsage() error {
 	percentage, err := cpu.Percent(0, true)
 	if err != nil {
 		return err
 	}
 	p := int(percentage[0])
 	if p <= 0 {
-		r.cpuPercentage = 1
+		r.cpuUsage = 1
 	} else {
-		r.cpuPercentage = p
+		r.cpuUsage = p
 	}
 
 	return nil
 }
 
-func (r *ConsulResolver) calFactorThreshold() error {
+func (r *ConsulResolver) updateFactorThreshold() error {
 	services, metainfo, err := r.client.Health().Service(r.myService, "", true, &api.QueryOptions{
 		WaitIndex: r.myLastIndex,
 	})
@@ -233,12 +226,13 @@ func (r *ConsulResolver) calFactorThreshold() error {
 
 	r.factorThreshold = factorThreshold
 	r.myServiceNum = myServiceNum
-	fmt.Printf("update factorThreshold [%v], lastIndex [%v]\n", r.factorThreshold, r.myLastIndex)
+	fmt.Printf("update factorThreshold [%v], lastIndex [%v]\n", factorThreshold, r.myLastIndex)
+	fmt.Printf("update myServiceNum [%v], lastIndex [%v]\n", myServiceNum, r.myLastIndex)
 
 	return nil
 }
 
-func (r *ConsulResolver) resolve() error {
+func (r *ConsulResolver) updateServiceZone() error {
 	services, metainfo, err := r.client.Health().Service(r.service, "", true, &api.QueryOptions{
 		WaitIndex: r.lastIndex,
 	})
@@ -271,17 +265,11 @@ func (r *ConsulResolver) resolve() error {
 		if zone == r.zone {
 			localZone.Nodes = append(localZone.Nodes, node)
 			localZone.FactorMax += node.BalanceFactor
-			localZone.Factors = append(
-				localZone.Factors,
-				localZone.FactorMax,
-			)
+			localZone.Factors = append(localZone.Factors, localZone.FactorMax)
 		} else {
 			otherZone.Nodes = append(otherZone.Nodes, node)
 			otherZone.FactorMax += node.BalanceFactor
-			otherZone.Factors = append(
-				otherZone.Factors,
-				otherZone.FactorMax,
-			)
+			otherZone.Factors = append(otherZone.Factors, otherZone.FactorMax)
 		}
 	}
 
@@ -289,9 +277,9 @@ func (r *ConsulResolver) resolve() error {
 	r.otherZone = &otherZone
 
 	var buf []byte
-	buf, _ = json.Marshal(r.localZone)
+	buf, _ = json.Marshal(localZone)
 	fmt.Printf("update localZone [%v], lastIndex [%v]\n", string(buf), r.lastIndex)
-	buf, _ = json.Marshal(r.otherZone)
+	buf, _ = json.Marshal(otherZone)
 	fmt.Printf("update otherZone [%v], lastIndex [%v]\n", string(buf), r.lastIndex)
 
 	return nil
