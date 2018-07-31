@@ -1,5 +1,5 @@
 hash: 5c618ac9288173f5119e5a89c98164e2b968b8f0ed77f4e539292ca96b58bc6d
-updated: 2018-07-25T17:25:15.36255+08:00
+updated: 2018-07-29T19:42:49.105305+08:00
 imports:
 - name: github.com/armon/go-metrics
   version: 58588f401c2cc130a7308a52ca3bc6c0a76db04b
@@ -41,4 +41,10 @@ imports:
   subpackages:
   - unix
   - windows
-testImports: []
+testImports:
+- name: github.com/sirupsen/logrus
+  version: 3e01752db0189b9157070a0e1668a620f9a85da2
+- name: golang.org/x/crypto
+  version: a49355c7e3f8fe157a85be2f77e6e269a0f89602
+  subpackages:
+  - ssh/terminal
