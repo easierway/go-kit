@@ -15,23 +15,25 @@ import (
 
 // ConsulResolverBuilder builder
 type ConsulResolverBuilder struct {
-	Address   string
-	Service   string
-	Interval  time.Duration
-	MyService string
-	Ratio     float64
+	Address      string
+	Service      string
+	Interval     time.Duration
+	MyService    string
+	ServiceRatio float64
+	CPUThreshold float64
 }
 
 // Build a ConsulResolver
 func (b *ConsulResolverBuilder) Build() (*ConsulResolver, error) {
 	return NewConsulResolver(
-		b.Address, b.Service, b.MyService, b.Interval, b.Ratio,
+		b.Address, b.Service, b.MyService, b.Interval, b.ServiceRatio, b.CPUThreshold,
 	)
 }
 
 // NewConsulResolver create a new ConsulResolver
 func NewConsulResolver(
-	address string, service string, myService string, interval time.Duration, ratio float64,
+	address string, service string, myService string, interval time.Duration,
+	serviceRatio float64, cpuThreshold float64,
 ) (*ConsulResolver, error) {
 	config := api.DefaultConfig()
 	config.Address = address
@@ -41,21 +43,20 @@ func NewConsulResolver(
 	}
 
 	r := &ConsulResolver{
-		client:    client,
-		service:   service,
-		myService: myService,
-		interval:  interval,
-		ratio:     ratio,
-		done:      false,
-		cpuUsage:  50,
-		zone:      zone(),
+		client:       client,
+		service:      service,
+		myService:    myService,
+		interval:     interval,
+		serviceRatio: serviceRatio,
+		cpuThreshold: cpuThreshold,
+		done:         false,
+		cpuUsage:     50,
+		zone:         zone(),
 	}
 
 	if err := r.Start(); err != nil {
 		return nil, err
 	}
-
-	fmt.Printf("new consul resolver %#v\n", r)
 
 	return r, nil
 }
@@ -75,7 +76,10 @@ type ConsulResolver struct {
 	interval        time.Duration
 	done            bool
 	cpuUsage        int
-	ratio           float64
+	serviceRatio    float64
+	cpuThreshold    float64
+
+	logger Logger
 }
 
 // ServiceNode service node
@@ -94,6 +98,11 @@ type ServiceZone struct {
 	FactorMax int
 }
 
+// SetLogger set logger
+func (r *ConsulResolver) SetLogger(logger Logger) {
+	r.logger = logger
+}
+
 // Start resolve
 func (r *ConsulResolver) Start() error {
 	if err := r.updateCPUUsage(); err != nil {
@@ -106,12 +115,18 @@ func (r *ConsulResolver) Start() error {
 		return err
 	}
 
+	if r.logger != nil {
+		r.logger.Infof("new consul resolver start. [%#v]", r)
+	}
+
 	go func() {
 		for range time.Tick(r.interval) {
 			if r.done {
 				break
 			}
-			r.updateCPUUsage()
+			if err := r.updateCPUUsage(); err != nil {
+				r.logger.Warnf("update cpu usage failed. err: [%v]", err)
+			}
 		}
 	}()
 	go func() {
@@ -119,7 +134,9 @@ func (r *ConsulResolver) Start() error {
 			if r.done {
 				break
 			}
-			r.updateFactorThreshold()
+			if err := r.updateFactorThreshold(); err != nil {
+				r.logger.Warnf("update factor threshold failed. err: [%v]", err)
+			}
 		}
 	}()
 	go func() {
@@ -127,7 +144,9 @@ func (r *ConsulResolver) Start() error {
 			if r.done {
 				break
 			}
-			r.updateServiceZone()
+			if err := r.updateServiceZone(); err != nil {
+				r.logger.Warnf("update service zone failed. err: [%v]", err)
+			}
 		}
 	}()
 
@@ -159,12 +178,15 @@ func (r *ConsulResolver) DiscoverNode() *ServiceNode {
 	}
 
 	factorThreshold := r.factorThreshold
-	if r.ratio != 0 {
-		m := float64((localZone.FactorMax+otherZone.FactorMax)*r.myServiceNum) * r.ratio
+	if r.serviceRatio != 0 {
+		m := float64((localZone.FactorMax+otherZone.FactorMax)*r.myServiceNum) * r.serviceRatio
 		n := float64(len(localZone.Factors) + len(otherZone.Factors))
 		factorThreshold = int(m / n)
 	}
 	factorThreshold = factorThreshold * r.cpuUsage / 100
+	if r.cpuThreshold != 0 {
+		factorThreshold = int(float64(factorThreshold) / r.cpuThreshold)
+	}
 
 	serviceZone := localZone
 	if factorThreshold > localZone.FactorMax || localZone.FactorMax <= 0 {
@@ -226,8 +248,10 @@ func (r *ConsulResolver) updateFactorThreshold() error {
 
 	r.factorThreshold = factorThreshold
 	r.myServiceNum = myServiceNum
-	fmt.Printf("update factorThreshold [%v], lastIndex [%v]\n", factorThreshold, r.myLastIndex)
-	fmt.Printf("update myServiceNum [%v], lastIndex [%v]\n", myServiceNum, r.myLastIndex)
+	if r.logger != nil {
+		r.logger.Infof("update factorThreshold [%v], lastIndex [%v]", factorThreshold, r.myLastIndex)
+		r.logger.Infof("update myServiceNum [%v], lastIndex [%v]", myServiceNum, r.myLastIndex)
+	}
 
 	return nil
 }
@@ -276,11 +300,13 @@ func (r *ConsulResolver) updateServiceZone() error {
 	r.localZone = &localZone
 	r.otherZone = &otherZone
 
-	var buf []byte
-	buf, _ = json.Marshal(localZone)
-	fmt.Printf("update localZone [%v], lastIndex [%v]\n", string(buf), r.lastIndex)
-	buf, _ = json.Marshal(otherZone)
-	fmt.Printf("update otherZone [%v], lastIndex [%v]\n", string(buf), r.lastIndex)
+	if r.logger != nil {
+		var buf []byte
+		buf, _ = json.Marshal(localZone)
+		r.logger.Infof("update localZone [%v], lastIndex [%v]", string(buf), r.lastIndex)
+		buf, _ = json.Marshal(otherZone)
+		r.logger.Infof("update otherZone [%v], lastIndex [%v]", string(buf), r.lastIndex)
+	}
 
 	return nil
 }

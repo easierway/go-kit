@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+// Logger for log
+type Logger interface {
+	Infof(format string, v ...interface{})
+	Warnf(format string, v ...interface{})
+}
+
 func zone() string {
 	out, err := exec.Command("/bin/bash", "-c", "/opt/aws/bin/ec2-metadata -z").Output()
 	if err != nil {

@@ -5,10 +5,26 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
+type MyLogger struct {
+	log *logrus.Logger
+}
+
+func (l *MyLogger) Infof(format string, v ...interface{}) {
+	l.log.Infof(format, v...)
+}
+
+func (l *MyLogger) Warnf(format string, v ...interface{}) {
+	l.log.Warnf(format, v...)
+}
+
 func TestConsulResolver(t *testing.T) {
-	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond, 0)
+	myLogger := &MyLogger{log: logrus.New()}
+	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond, 0, 0.7)
+	r.SetLogger(myLogger)
 	if err != nil {
 		panic(err)
 	}
@@ -28,7 +44,9 @@ func TestConsulResolver(t *testing.T) {
 }
 
 func TestConcurrency(t *testing.T) {
-	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond, 0)
+	myLogger := &MyLogger{log: logrus.New()}
+	r, err := NewConsulResolver("127.0.0.1:8500", "hatlonly-test-service", "my-service", 200*time.Millisecond, 0, 0.7)
+	r.SetLogger(myLogger)
 	if err != nil {
 		panic(err)
 	}
