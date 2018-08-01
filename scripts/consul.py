@@ -18,8 +18,12 @@ def local_ip():
     return ip
 
 
-def default_balance_factor_map(dst="consul/factor_map.json", consul="localhost:8500"):
-    url = "http://{}/v1/kv/{}?raw=true".format(consul, dst)
+def default_balance_factor_map(fm="consul/factor_map.json", consul="localhost:8500"):
+    if not fm:
+        fm = "consul/factor_map.json"
+    if not consul:
+        consul = "localhost:8500"
+    url = "http://{}/v1/kv/{}?raw=true".format(consul, fm)
     res = requests.get(url)
     if res.status_code != 200:
         return {
@@ -31,8 +35,8 @@ def default_balance_factor_map(dst="consul/factor_map.json", consul="localhost:8
     return json.loads(res.text)
 
 
-def default_balance_factor(dst="consul/factor_map.json", consul="localhost:8500"):
-    factor_map = default_balance_factor_map(dst, consul)
+def default_balance_factor(fm="consul/factor_map.json", consul="localhost:8500"):
+    factor_map = default_balance_factor_map(fm, consul)
     print(factor_map)
 
     status, output = subprocess.getstatusoutput("/opt/aws/bin/ec2-metadata -t")
@@ -68,10 +72,10 @@ def tag():
 
 def payload(service, port, tags=[], interval="10s", timeout="1s",
             deregister_critical_service_after="90m",
-            balance_factor=None, zone=None, dst=None, consul="localhost:8500"):
+            balance_factor=None, zone=None, fm=None, consul="localhost:8500"):
     ip = local_ip()
     if not balance_factor:
-        balance_factor = str(default_balance_factor(dst, consul))
+        balance_factor = str(default_balance_factor(fm, consul))
     if not zone:
         zone = default_zone()
 
@@ -174,12 +178,12 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""Example:
-    python3 consul.py config sg > /etc/consul.json
+    python3 consul.py config sg > /etc/consul/consul.json
     python3 consul.py kvput --src factor_map.json --dst consul/as/factor_map.json
     python3 consul.py kvget consul/as/factor_map.json
     python3 consul.py register as 9099 --factor-map consul/as/factor_map.json
     python3 consul.py register rs 7077 --factor-map consul/rs/factor_map.json
-    python3 consul.py services as | jq '.[] | {Node,ServiceID}'
+    python3 consul.py services as | jq '.[] | {Service}'
 """,
     )
     parser.add_argument("operation", nargs="?", type=str,
@@ -214,7 +218,7 @@ def main():
                 deregister_critical_service_after=args.deregister,
                 balance_factor=args.factor,
                 zone=args.zone,
-                dst=args.dst,
+                fm=args.factor_map,
             ),
             args.consul
         )
