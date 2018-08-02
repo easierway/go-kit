@@ -164,7 +164,7 @@ def config(datacenter):
         "bootstrap_expect": 0,
         "bind_addr": local_ip(),
         "client_addr": "127.0.0.1",
-        "retry_join": ["provider=aws tag_key=Name tag_value={} region={}".format(tag(), default_zone())],
+        # "retry_join": ["provider=aws tag_key=Name tag_value={} region={}".format(tag(), default_zone())],
         "retry_interval": "3s",
         "raft_protocol": 3,
         "enable_debug": False,
@@ -183,7 +183,7 @@ def main():
     python3 consul.py kvget consul/as/factor_map.json
     python3 consul.py register as 9099 --factor-map consul/as/factor_map.json
     python3 consul.py register rs 7077 --factor-map consul/rs/factor_map.json
-    python3 consul.py services as | jq '.[] | {Service}'
+    python3 consul.py services rs | jq '.[] | {Service}'
 """,
     )
     parser.add_argument("operation", nargs="?", type=str,
