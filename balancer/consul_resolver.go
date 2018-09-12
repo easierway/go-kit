@@ -208,7 +208,7 @@ func (r *ConsulResolver) updateCPUUsage() error {
 	if err != nil {
 		return err
 	}
-	if percentage == nil {
+	if percentage == nil || len(percentage) == 0 {
 		r.cpuUsage = 50
 		return nil
 	}
