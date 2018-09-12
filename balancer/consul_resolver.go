@@ -208,6 +208,10 @@ func (r *ConsulResolver) updateCPUUsage() error {
 	if err != nil {
 		return err
 	}
+	if percentage == nil {
+		r.cpuUsage = 50
+		return nil
+	}
 	p := int(percentage[0])
 	if p <= 0 {
 		r.cpuUsage = 1
