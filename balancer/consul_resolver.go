@@ -168,6 +168,11 @@ func (r *ConsulResolver) GetOtherZone() *ServiceZone {
 	return r.otherZone
 }
 
+// Get myService num
+func (r *ConsulResolver) GetMyServiceNum() int {
+	return r.myServiceNum
+}
+
 // DiscoverNode get one address
 func (r *ConsulResolver) DiscoverNode() *ServiceNode {
 	localZone := r.localZone
