@@ -43,15 +43,17 @@ func NewConsulResolver(
 	}
 
 	r := &ConsulResolver{
-		client:       client,
-		service:      service,
-		myService:    myService,
-		interval:     interval,
-		serviceRatio: serviceRatio,
-		cpuThreshold: cpuThreshold,
-		done:         false,
-		cpuUsage:     50,
-		zone:         zone(),
+		client:         client,
+		service:        service,
+		myService:      myService,
+		interval:       interval,
+		serviceRatio:   serviceRatio,
+		cpuThreshold:   cpuThreshold,
+		localZoneRound: &SmoothWeighted{},
+		otherZoneRound: &SmoothWeighted{},
+		done:           false,
+		cpuUsage:       50,
+		zone:           zone(),
 	}
 
 	if err := r.Start(); err != nil {
@@ -78,6 +80,8 @@ type ConsulResolver struct {
 	cpuUsage        int
 	serviceRatio    float64
 	cpuThreshold    float64
+	localZoneRound  *SmoothWeighted
+	otherZoneRound  *SmoothWeighted
 
 	logger Logger
 }
@@ -171,6 +175,27 @@ func (r *ConsulResolver) GetOtherZone() *ServiceZone {
 // Get myService num
 func (r *ConsulResolver) GetMyServiceNum() int {
 	return r.myServiceNum
+}
+
+// get best address
+func (r *ConsulResolver) BestAddr() string {
+	localZoneLen := r.localZoneRound.GetLen()
+	otherZoneLen := r.otherZoneRound.GetLen()
+	if localZoneLen == 0 && otherZoneLen > 0 {
+		return r.otherZoneRound.Next()
+	}
+	maxLocalItems := localZoneLen
+	if r.serviceRatio != 0 {
+		maxLocalItems = int(float64(r.myServiceNum) * r.serviceRatio)
+	}
+
+	if localZoneLen <= maxLocalItems {
+		return r.localZoneRound.Next()
+	} else {
+		return r.otherZoneRound.Next()
+	}
+
+	return r.localZoneRound.Next()
 }
 
 // DiscoverNode get one address
@@ -299,10 +324,12 @@ func (r *ConsulResolver) updateServiceZone() error {
 			localZone.Nodes = append(localZone.Nodes, node)
 			localZone.FactorMax += node.BalanceFactor
 			localZone.Factors = append(localZone.Factors, localZone.FactorMax)
+			r.localZoneRound.Add(node.Address, node.BalanceFactor)
 		} else {
 			otherZone.Nodes = append(otherZone.Nodes, node)
 			otherZone.FactorMax += node.BalanceFactor
 			otherZone.Factors = append(otherZone.Factors, otherZone.FactorMax)
+			r.otherZoneRound.Add(node.Address, node.BalanceFactor)
 		}
 	}
 
