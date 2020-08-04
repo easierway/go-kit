@@ -27,22 +27,10 @@ def default_balance_factor_map(fm="consul/factor_map.json", consul="localhost:85
     res = requests.get(url)
     if res.status_code != 200:
         return {
-            "m4.2xlarge": 700,
-            "m4.4xlarge": 1200,
-            "r3.4xlarge": 1200,
-            "r4.4xlarge": 1300,
-            "c3.4xlarge": 1300,
-            "c4.4xlarge": 1300,
-            "c5.4xlarge": 1600,
-            "c3.8xlarge": 2700,
-            "c4.8xlarge": 2700,
-            "c5.9xlarge": 3400,
-            "c5d.9xlarge": 3300,
-            "m5.4xlarge": 1600,
-            "m5d.4xlarge": 1600,
-            "r5.4xlarge": 1600,
-            "r5.2xlarge": 800,
-            "unknown": 1000
+            "m4.4xlarge": 100,
+            "r4.4xlarge": 100,
+            "c4.4xlarge": 100,
+            "unknown": 100,
         }
     return json.loads(res.text)
 
@@ -51,38 +39,38 @@ def default_balance_factor(fm="consul/factor_map.json", consul="localhost:8500")
     factor_map = default_balance_factor_map(fm, consul)
     print(factor_map)
 
-    status, output = subprocess.getstatusoutput("/opt/aws/bin/ec2-metadata -t")
+    status, output = subprocess.getstatusoutput("curl -s http://169.254.169.254/latest/meta-data/instance-type")
     machine = "unknown"
     if status == 0:
-        machine = output.split()[1]
+        machine = output.split()[0]
 
     if machine in factor_map:
         return factor_map[machine]
 
-    return 1000
+    return 100
 
 
 def default_zone():
-    status, output = subprocess.getstatusoutput("/opt/aws/bin/ec2-metadata -z")
+    status, output = subprocess.getstatusoutput("curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone")
     zone = "unknown"
     if status == 0:
-        zone = output.split()[1]
+        zone = output.split()[0]
     return zone
 
 
 def default_instanceID():
-    status, output = subprocess.getstatusoutput("/opt/aws/bin/ec2-metadata -i")
+    status, output = subprocess.getstatusoutput("curl -s http://169.254.169.254/latest/meta-data/instance-id")
     instanceID = "unknown"
     if status == 0:
-        instanceID = output.split()[1]
+        instanceID = output.split()[0]
     return instanceID
 
 
 def default_publicIP():
-    status, output = subprocess.getstatusoutput("/opt/aws/bin/ec2-metadata -v")
+    status, output = subprocess.getstatusoutput("curl -s http://169.254.169.254/latest/meta-data/public-ipv4")
     publicIP = "unknown"
     if status == 0:
-        publicIP = output.split()[1]
+        publicIP = output.split()[0]
     return publicIP
 
 
@@ -101,6 +89,7 @@ def tag():
 def payload(service, port, tags=[], interval="10s", timeout="1s",
             deregister_critical_service_after="90m",
             balance_factor=None, zone=None, instanceID=None, publicIP=None, fm=None, consul="localhost:8500"):
+
     ip = local_ip()
     if not balance_factor:
         balance_factor = str(default_balance_factor(fm, consul))
