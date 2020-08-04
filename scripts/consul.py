@@ -27,22 +27,10 @@ def default_balance_factor_map(fm="consul/factor_map.json", consul="localhost:85
     res = requests.get(url)
     if res.status_code != 200:
         return {
-            "m4.2xlarge": 700,
-            "m4.4xlarge": 1200,
-            "r3.4xlarge": 1200,
-            "r4.4xlarge": 1300,
-            "c3.4xlarge": 1300,
-            "c4.4xlarge": 1300,
-            "c5.4xlarge": 1600,
-            "c3.8xlarge": 2700,
-            "c4.8xlarge": 2700,
-            "c5.9xlarge": 3400,
-            "c5d.9xlarge": 3300,
-            "m5.4xlarge": 1600,
-            "m5d.4xlarge": 1600,
-            "r5.4xlarge": 1600,
-            "r5.2xlarge": 800,
-            "unknown": 1000
+            "m4.4xlarge": 100,
+            "r4.4xlarge": 100,
+            "c4.4xlarge": 100,
+            "unknown": 100,
         }
     return json.loads(res.text)
 
@@ -59,7 +47,7 @@ def default_balance_factor(fm="consul/factor_map.json", consul="localhost:8500")
     if machine in factor_map:
         return factor_map[machine]
 
-    return 1000
+    return 100
 
 
 def default_zone():
